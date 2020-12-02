@@ -25,9 +25,12 @@ from utils import weights_init_normal
 from utils import print_network
 from datasets import ImageDataset
 
+import time
+import datetime
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--epoch', type=int, default=0, help='starting epoch')
-parser.add_argument('--n_epochs', type=int, default=200, help='number of epochs of training')
+parser.add_argument('--epoch', type=int, default=2400, help='starting epoch')
+parser.add_argument('--n_epochs', type=int, default=10000, help='number of epochs of training')
 parser.add_argument('--batchSize', type=int, default=1, help='size of the batches')
 parser.add_argument('--dataroot', type=str, default='datasets/horse2zebra/', help='root directory of the dataset')
 parser.add_argument('--save_name', type=str, default='ar_neutral2happiness')
@@ -46,6 +49,9 @@ parser.add_argument('--lambda_reg', type=float, default=1e-6)
 parser.add_argument('--gan_curriculum', type=int, default=10, help='Strong GAN loss for certain period at the beginning')
 parser.add_argument('--starting_rate', type=float, default=0.01, help='Set the lambda weight between GAN loss and Recon loss during curriculum period at the beginning. We used the 0.01 weight.')
 parser.add_argument('--default_rate', type=float, default=0.5, help='Set the lambda weight between GAN loss and Recon loss after curriculum period. We used the 0.5 weight.')
+
+parser.add_argument('--sample_step', type=int, default=1000)
+parser.add_argument('--model_save_step', type=int, default=10000)
 
 opt = parser.parse_args()
 print(opt)
@@ -114,6 +120,7 @@ dataloader = DataLoader(ImageDataset(opt.dataroot, transforms_=transforms_, unal
 logger = Logger(opt.n_epochs, len(dataloader))
 
 ###### Training ######
+start_time = time.time()
 for epoch in range(opt.epoch, opt.n_epochs):
     for i, batch in enumerate(dataloader):
         # Set model input
@@ -159,10 +166,10 @@ for epoch in range(opt.epoch, opt.n_epochs):
         # Total loss
         if epoch < opt.gan_curriculum:
             rate = opt.starting_rate
-            print('using curriculum gan')
+            #print('using curriculum gan')
         else:
             rate = opt.default_rate
-            print('using normal gan')
+            #print('using normal gan')
 
         loss_G = ((loss_GAN_A2B + loss_GAN_B2A)*0.5 + (loss_reg_A + loss_reg_B))* (1.-rate) + ((loss_cycle_ABA + loss_cycle_BAB)*opt.lambda_cycle+(loss_pix_B+loss_pix_A)*opt.lambda_pixel)* rate
     
@@ -196,29 +203,45 @@ for epoch in range(opt.epoch, opt.n_epochs):
         loss_D.backward()
         optimizer_D.step()
 
-        print('Epoch [%d/%d], Batch [%d/%d], loss_D: %.4f, loss_G: %.4f' % (epoch+1, opt.n_epochs,i+1, len(dataloader), loss_D.data[0], loss_G.data[0])) 
-        print('loss_GAN_A2B: %.4f, loss_GAN_B2A: %.4f, loss_cycle_ABA: %.4f, loss_cycle_BAB: %.4f, loss_identity_A: %.4f, loss_identity_B: %.4f, loss_pix_A: %.4f, loss_pix_B: %.4f' % (loss_GAN_A2B.data[0], 
-            loss_GAN_B2A.data[0], loss_cycle_ABA.data[0], loss_cycle_BAB.data[0], loss_identity_A.data[0], loss_identity_B.data[0], loss_pix_A.data[0], loss_pix_B.data[0])) 
+        #print('Epoch [%d/%d], Batch [%d/%d], loss_D: %.4f, loss_G: %.4f'.format(epoch+1, opt.n_epochs,i+1, len(dataloader), loss_D.data[0], loss_G.data[0])) 
+        if (epoch+1) % 5 == 0 and i == 5:
+          et = time.time() - start_time
+          et = str(datetime.timedelta(seconds=et))[:-7]
+          #print('Epoch [%d/%d], loss_D: %.4f, loss_G: %.4f' % (epoch+1, opt.n_epochs,i+1, loss_D.data[0], loss_G.data[0])) 
+          print('%s Epoch [%d/%d], Batch [%d/%d], loss_D: %.4f, loss_G: %.4f' % (et, epoch+1, opt.n_epochs,i+1, len(dataloader), loss_D.item(), loss_G.item())) 
+          print('%s loss_GAN_A2B: %.4f, loss_GAN_B2A: %.4f, loss_cycle_ABA: %.4f, loss_cycle_BAB: %.4f, loss_identity_A: %.4f, loss_identity_B: %.4f, loss_pix_A: %.4f, loss_pix_B: %.4f' % (et, loss_GAN_A2B.item(), 
+              loss_GAN_B2A.item(), loss_cycle_ABA.item(), loss_cycle_BAB.item(), loss_identity_A.item(), loss_identity_B.item(), loss_pix_A.item(), loss_pix_B.item())) 
 
         save_path='%s/%s' % (opt.save_name, 'training')
         if not os.path.exists(save_path):
             os.makedirs(save_path)
 
-        save_image(torch.cat([
-            real_A.data.cpu()[0] * 0.5 + 0.5,
-            mask_B.data.cpu()[0],
-            fake_B.data.cpu()[0]*0.5+0.5, temp_B.data.cpu()[0]*0.5+0.5], 2),
-            '%s/%04d_%04d_progress_B.png' % (save_path,epoch+1,i+1))
+        if (epoch+1) % opt.sample_step == 0 and i == 5:
+          print('save sample:%s/%04d_%04d_progress_B.png' % (save_path,epoch+1,i+1))
+          save_image(torch.cat([
+              real_A.data.cpu()[0] * 0.5 + 0.5,
+              mask_B.data.cpu()[0],
+              fake_B.data.cpu()[0]*0.5+0.5, temp_B.data.cpu()[0]*0.5+0.5], 2),
+              '%s/%04d_%04d_progress_B.png' % (save_path,epoch+1,i+1))
+          save_image(torch.cat([real_A.data.cpu()[0] * 0.5 + 0.5, temp_B.data.cpu()[0]*0.5+0.5], 2),
+              '%s/%04d_%04d_temp_B.png' % (save_path,epoch+1,i+1))
 
-        save_image(torch.cat([
-            real_B.data.cpu()[0] * 0.5 + 0.5,
-            mask_A.data.cpu()[0],
-            fake_A.data.cpu()[0]*0.5+0.5, temp_A.data.cpu()[0]*0.5+0.5], 2),
-            '%s/%04d_%04d_progress_A.png' % (save_path,epoch+1,i+1))
+        if (epoch+1) % opt.sample_step == 0 and i == 5:
+          print('save sample:%s/%04d_%04d_progress_A.png' % (save_path,epoch+1,i+1))
+          save_image(torch.cat([
+              real_B.data.cpu()[0] * 0.5 + 0.5,
+              mask_A.data.cpu()[0],
+              fake_A.data.cpu()[0]*0.5+0.5, temp_A.data.cpu()[0]*0.5+0.5], 2),
+              '%s/%04d_%04d_progress_A.png' % (save_path,epoch+1,i+1))
 
     # Update learning rates
     lr_scheduler_G.step()
     lr_scheduler_D.step()
+
+    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netG_A2B.pth'))
+    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netG_B2A.pth'))
+    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netD_A.pth'))
+    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netD_B.pth'))
 
     torch.save(netG_A2B.state_dict(), '%s/%s' % (opt.save_name, 'netG_A2B.pth'))
     torch.save(netG_B2A.state_dict(), '%s/%s' % (opt.save_name, 'netG_B2A.pth'))
