@@ -224,7 +224,7 @@ for epoch in range(opt.epoch, opt.n_epochs):
               fake_B.data.cpu()[0]*0.5+0.5, temp_B.data.cpu()[0]*0.5+0.5], 2),
               '%s/%04d_%04d_progress_B.png' % (save_path,epoch+1,i+1))
           save_image(torch.cat([real_A.data.cpu()[0] * 0.5 + 0.5, temp_B.data.cpu()[0]*0.5+0.5], 2),
-              '%s/%04d_%04d_temp_B.png' % (save_path,epoch+1,i+1))
+              '/content/drive/MyDrive/%s/%04d_%04d_temp_B.png' % (opt.save_name,epoch+1,i+1))
 
         if (epoch+1) % opt.sample_step == 0 and i == 5:
           print('save sample:%s/%04d_%04d_progress_A.png' % (save_path,epoch+1,i+1))
@@ -238,10 +238,10 @@ for epoch in range(opt.epoch, opt.n_epochs):
     lr_scheduler_G.step()
     lr_scheduler_D.step()
 
-    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netG_A2B.pth'))
-    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netG_B2A.pth'))
-    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netD_A.pth'))
-    torch.save('/content/drive/MyDrive/AttentionGAN/', '%s/%s' % (opt.save_name, 'netD_B.pth'))
+    torch.save(netG_A2B.state_dict(), '/content/drive/MyDrive/%s/%s' % (opt.save_name, 'netG_A2B.pth'))
+    torch.save(netG_B2A.state_dict(), '/content/drive/MyDrive/%s/%s' % (opt.save_name, 'netG_B2A.pth'))
+    torch.save(netD_A.state_dict(), '/content/drive/MyDrive/%s/%s' % (opt.save_name, 'netD_A.pth'))
+    torch.save(netD_B.state_dict(), '/content/drive/MyDrive/%s/%s' % (opt.save_name, 'netD_B.pth'))
 
     torch.save(netG_A2B.state_dict(), '%s/%s' % (opt.save_name, 'netG_A2B.pth'))
     torch.save(netG_B2A.state_dict(), '%s/%s' % (opt.save_name, 'netG_B2A.pth'))
